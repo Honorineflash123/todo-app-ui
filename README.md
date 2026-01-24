@@ -1,61 +1,131 @@
-# TodoAppUi
+# Todo Application – Frontend UI
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 19.0.6.
+This repository contains the frontend user interface for the Todo application.
 
-## Development server
+The frontend is built with Angular and served using NGINX. It is containerized with Docker and deployed to a private Kubernetes cluster on AWS.
 
+---
 
-To start a local development server, run:
-- clone Repository
-- install dependencies
-  ```bash 
-  npm install
-  ```
-- run the application
-```bash
-ng serve
-```
+## 📌 Application Responsibilities
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+The frontend provides:
+- User interface for managing todo tasks
+- Communication with the backend API via `/api`
+- Static content delivery via NGINX
 
-## Deploying the Application on GCP
+The frontend does not directly access the database.
 
-### steps
-1. Build the Angular application for production:
-  ```bash
-  ng build --prod
-  ```
-This will generate the production-ready files in the dist/ directory.
+---
 
-2. Install the Firebase CLI:
-  ```bash
-  npm install -g firebase-tools
-  ```
+## 🗂️ Project Structure
 
-3. Initialize Firebase Hosting and select GCP project:
-  ```bash
-  firebase init hosting
-  ```
-4. Deploy the application:
-  ```bash
-  firebase deploy
-  ```
-## Using the To-Do List Application
+```text
+todo-app-ui/
+├── angular.json
+├── Dockerfile
+├── firebase.json
+├── nginx.conf
+├── package.json
+├── package-lock.json
+├── public/
+├── src/
+├── tsconfig.app.json
+├── tsconfig.json
+├── tsconfig.spec.json
+├── README.md
 
-Navigate to the application in your browser.
-- Sign-in Page:
+🛠️ Technologies Used
 
-Sign-in by filling out the form.
-If you do not have an account, click the "Sign up" link to navigate to the sign-up page.
-- Dashboard:
+    Angular
 
-View your list of tasks.
+    NGINX
 
-Use the "Create Task" button to add a new task.
+    Docker
 
-Edit or delete tasks directly from the list.
+    Kubernetes
 
-- 404 Page:
+    AWS Elastic Container Registry (ECR)
 
-If you navigate to an invalid route, you'll see a "404 Page Not Found" message with a link to return to the home page.
+🐳 Docker
 
+The frontend uses a multi-stage Docker build:
+
+    Build stage (Angular)
+
+    Runtime stage (NGINX)
+
+Build locally
+
+docker build -t todo-frontend .
+
+Run locally (optional)
+
+docker run -p 80:80 todo-frontend
+
+☸️ Kubernetes Deployment
+
+The frontend is deployed using:
+
+    Deployment
+
+    ClusterIP Service
+
+    Ingress routing
+
+Routing behavior:
+
+/     → frontend service
+/api  → backend service
+
+The frontend is accessed only through Ingress.
+🌐 Application Access
+
+Due to AWS Load Balancer restrictions:
+
+    Kubernetes LoadBalancer services are unavailable
+
+    NodePort + reverse proxy is used
+
+Access flow:
+
+User → Public EC2 (NGINX) → NodePort → Ingress → Frontend
+
+📦 Container Registry (ECR)
+
+Frontend images are stored in AWS ECR.
+
+Example image:
+
+<account-id>.dkr.ecr.<region>.amazonaws.com/primus-capstone/frontend:latest
+
+🔄 CI (Continuous Integration)
+
+GitHub Actions is used to:
+
+    Build frontend Docker images
+
+    Push images to Amazon ECR
+
+🚫 CD Scope (Intentional)
+
+For this capstone:
+
+    Kubernetes deployments are applied manually
+
+    CI handles build and image publishing only
+
+This keeps the Kubernetes cluster secure and private.
+🔐 Security Design
+
+    Kubernetes nodes have no public IPs
+
+    Frontend pods run in private subnets
+
+    Traffic is routed through controlled entry points
+
+    Backend access is restricted via Ingress rules
+
+👤 Author
+
+Honorine
+Primus Capstone Project
