@@ -6,7 +6,7 @@ on:
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
-  ECR_REPOSITORY: primus-capstone-frontend
+  ECR_REPOSITORY: todo-ui
   IMAGE_TAG: dev
 
 jobs:
