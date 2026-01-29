@@ -14,7 +14,7 @@ env:
 
 jobs:
   build-and-push:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     outputs:
       image_tag: ${{ steps.meta.outputs.tag }}
@@ -48,29 +48,27 @@ jobs:
             ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.tag }}
 
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: build-and-push
 
     steps:
-      - name: Deploy frontend to Kubernetes via Bastion
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.BASTION_HOST }}
-          username: ${{ secrets.BASTION_USER }}
-          key: ${{ secrets.BASTION_SSH_KEY }}
-          script: |
-            set -e
+      - name: Checkout source code
+        uses: actions/checkout@v4
 
-            TAG="${{ needs.build-and-push.outputs.image_tag }}"
-            ECR="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com"
+      - name: Deploy frontend to Kubernetes (self-hosted runner)
+        run: |
+          set -e
 
-            echo "Deploying frontend image: $ECR/todo-ui:$TAG"
+          TAG="${{ needs.build-and-push.outputs.image_tag }}"
+          ECR="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com"
 
-            kubectl -n "${K8S_NAMESPACE}" set image \
-              deployment/${K8S_DEPLOYMENT} \
-              ${K8S_CONTAINER}=$ECR/todo-ui:$TAG
+          echo "Deploying frontend image: $ECR/todo-ui:$TAG"
 
-            kubectl -n "${K8S_NAMESPACE}" rollout status \
-              deployment/${K8S_DEPLOYMENT} --timeout=180s
+          kubectl -n "${K8S_NAMESPACE}" set image \
+            deployment/${K8S_DEPLOYMENT} \
+            ${K8S_CONTAINER}=$ECR/todo-ui:$TAG
 
-            kubectl -n "${K8S_NAMESPACE}" get pods -o wide
+          kubectl -n "${K8S_NAMESPACE}" rollout status \
+            deployment/${K8S_DEPLOYMENT} --timeout=180s
+
+          kubectl -n "${K8S_NAMESPACE}" get pods -o wide
