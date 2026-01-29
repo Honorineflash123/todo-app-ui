@@ -1,4 +1,4 @@
-name: Frontend CI (dev)
+name: Frontend CI/CD (dev)
 
 on:
   push:
@@ -6,16 +6,26 @@ on:
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
   ECR_REPOSITORY: todo-ui
-  IMAGE_TAG: dev
+  K8S_NAMESPACE: todo
+  K8S_DEPLOYMENT: todo-ui
+  K8S_CONTAINER: todo-ui
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
 
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
+
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
+
+      - name: Set image tag (commit SHA)
+        id: meta
+        run: echo "tag=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -25,13 +35,42 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Login to Amazon ECR
-        id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build Docker image
         run: |
-          docker build -t ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} .
+          docker build \
+            -t ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.tag }} .
 
       - name: Push Docker image to ECR
         run: |
-          docker push ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+          docker push \
+            ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ steps.meta.outputs.tag }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+
+    steps:
+      - name: Deploy frontend to Kubernetes via Bastion
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.BASTION_HOST }}
+          username: ${{ secrets.BASTION_USER }}
+          key: ${{ secrets.BASTION_SSH_KEY }}
+          script: |
+            set -e
+
+            TAG="${{ needs.build-and-push.outputs.image_tag }}"
+            ECR="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com"
+
+            echo "Deploying frontend image: $ECR/todo-ui:$TAG"
+
+            kubectl -n "${K8S_NAMESPACE}" set image \
+              deployment/${K8S_DEPLOYMENT} \
+              ${K8S_CONTAINER}=$ECR/todo-ui:$TAG
+
+            kubectl -n "${K8S_NAMESPACE}" rollout status \
+              deployment/${K8S_DEPLOYMENT} --timeout=180s
+
+            kubectl -n "${K8S_NAMESPACE}" get pods -o wide
